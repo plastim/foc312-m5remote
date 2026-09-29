@@ -19,6 +19,8 @@
 #include <esp_netif.h>
 #include <esp_netif_sta_list.h>
 #include <esp_wifi.h>
+#include <esp_sleep.h>
+#include <driver/rtc_io.h>
 #include <lwip/sockets.h>
 
 extern "C" {
@@ -870,6 +872,12 @@ void setup() {
     pinMode(PIN_MX, INPUT);
     pinMode(PIN_PUSH1, INPUT);
     pinMode(PIN_PUSH4, INPUT);
+    // A button still held at boot (the MX press that woke the remote from sleep) must not count as a press: it only
+    // counts after it has been released and pressed again. Otherwise the wake press would be read as START.
+    for (Button *b : {&btn_mx, &btn_p1, &btn_p4}) {
+        b->state = digitalRead(b->pin) == HIGH;
+        b->changed = millis();
+    }
     canvas.setColorDepth(8);
     canvas.createSprite(320, 240);
     LittleFS.begin(true);
@@ -888,8 +896,11 @@ void setup() {
 }
 
 // The power button: a short press switches the remote off, tidily. Output first: STOP (if running), both channels to
-// zero and the box's signal stopped, the settings saved; then the power chip is told to switch off. Switching on stays
-// the power chip's own short press. (The chip's 6 s hold once left the ESP32 half-powered; this avoids needing it.)
+// zero and the box's signal stopped, the settings saved. Then DEEP SLEEP, not the power chip's off: on the OSSM
+// carrier (battery on the M-bus BAT pin) a CoreS3 SE whose AXP2101 is off cannot be switched on again by its power
+// button, only by USB power (tested 2026-09-29, also after the chip's own 6 s hold). In deep sleep the screen, Wi-Fi
+// and the audio/camera/SD rails are off (the 5 V boost stays on, see below) and the MX button or a knob press (RTC GPIOs, high = pressed)
+// wakes it; waking is a normal boot (levels 0, stopped). The chip's 6 s hold remains the full off for storage.
 static void power_off() {
     ctrl_settings_t s;
     {
@@ -907,8 +918,25 @@ static void power_off() {
     M5.Display.setFont(&fonts::Font2);
     M5.Display.setTextColor(0x8410, TFT_BLACK);
     M5.Display.drawCentreString("remote - switching off", 160, 150);
-    delay(400);                                                    // let the stop reach the box
-    M5.Power.powerOff();
+    M5.Display.drawCentreString("press the big button to switch on", 160, 172);
+    delay(1500);                                                   // let the stop reach the box; time to read
+    // a button still held would wake it at once: wait for all three to be released
+    while (digitalRead(PIN_MX) == HIGH || digitalRead(PIN_PUSH1) == HIGH || digitalRead(PIN_PUSH4) == HIGH) delay(10);
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    M5.Display.setBrightness(0);
+    M5.Display.sleep();
+    // NOT M5.Power.setExtOutput(false): on the carrier the battery (M-bus BAT) seems to reach the AXP2101 through the
+    // SY7088 5 V boost, whose enable comes from the AW9523 on the 3.3 V rail. Switching the boost off (or the AXP off)
+    // cuts the power chip's own supply, and only USB brings it back (2026-09-29: dark, no button woke it).
+    M5.Power.Axp2101.writeRegister8(0x90, 0xB0);                  // ALDO1..4 off (audio, mic, camera, SD); boot restores
+    const uint64_t wake = (1ULL << PIN_MX) | (1ULL << PIN_PUSH1) | (1ULL << PIN_PUSH4);
+    for (gpio_num_t p : {(gpio_num_t)PIN_MX, (gpio_num_t)PIN_PUSH1, (gpio_num_t)PIN_PUSH4}) {
+        rtc_gpio_pullup_dis(p);
+        rtc_gpio_pulldown_en(p);                                   // released = low, whatever the carrier's resistors
+    }
+    esp_sleep_enable_ext1_wakeup(wake, ESP_EXT1_WAKEUP_ANY_HIGH);
+    esp_deep_sleep_start();
 }
 
 void loop() {

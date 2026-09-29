@@ -34,7 +34,7 @@ You can switch between the two any time. The box's own knob is the master limit 
 | Knob 3 / 4 turn | level of each wire pair | - | that pair's wires, both directions |
 | Knob 4 press | options | back | back |
 | MX button | start / **STOP** | start / STOP | start / STOP |
-| Power button | short press: switch off (output stopped first) | | |
+| Power button | short press: switch off (output stopped first); press the MX button to switch on | | |
 
 In the menus no knob touches the output, and STOP always works. The box's own knob stays the master limit: the
 remote's master is a share of it.
