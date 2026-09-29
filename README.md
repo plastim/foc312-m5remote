@@ -30,7 +30,7 @@ You can switch between the two any time. The box's own knob is the master limit 
 |---|---|---|---|
 | Knob 1 turn | master volume | scroll | move the highlight |
 | Knob 1 press | open patterns | pick | toggle / next |
-| Knob 2 turn | MA (the ET-312's sensation knob) | jump 10 | pulse shape |
+| Knob 2 turn | MA (Multi Adjust: the pattern's speed and feel, as on the ET-312) | jump 10 | pulse shape |
 | Knob 3 / 4 turn | level of each wire pair | - | that pair's wires, both directions |
 | Knob 4 press | options | back | back |
 | MX button | start / **STOP** | start / STOP | start / STOP |
