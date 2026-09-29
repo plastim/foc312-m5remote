@@ -8,6 +8,10 @@ It runs on the **OSSM M5 Remote** hardware by ortlof: an M5Stack CoreS3 SE on a 
 button. Build or buy one from **[ortlof/OSSM-M5-Remote](https://github.com/ortlof/OSSM-M5-Remote)**; this repository
 is its firmware for e-stim (written from scratch; the hardware design is ortlof's).
 
+> **Start here:** install the PC app with its
+> **[installation guide](https://github.com/plastim/foc312-engine/blob/main/INSTALL.md)**. It flashes this firmware
+> onto the remote and loads its patterns and settings (step 9 of the guide).
+
 ## Controls
 
 | Control | Main screen | Pattern list | Options (wiring picture) |
