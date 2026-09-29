@@ -79,12 +79,14 @@ You need the PC app installed ([installation guide](https://github.com/plastim/f
 and USB data cables for the remote and the box.
 
 **1. Plug in the remote and the box, and press Detect** (hub, **Boxes** tab). Both show up, with the box's firmware
-and its Wi-Fi MAC (the long `02:AB:...`-style number, also the box's USB serial number).
+and its Wi-Fi MAC (six pairs like `24:6f:28:…`; it's also the box's USB serial number). The first Detect can
+take up to a minute.
 
 ![The hub's device list: a FOC-Stim box and an M5 remote, detected](docs/images/hub-detect.png)
 
-**2. Put this firmware on the remote:** **M5 remote** tab, **Check for updates**, pick the newest release, then
-**Flash…** and **Flash now**. The remote must be stopped (not playing). This replaces the OSSM firmware the remote
+**2. Put this firmware on the remote:** **M5 remote** tab, **M5 remote firmware**: **Check for updates**,
+**Download** the latest release, choose it in **Image**, then **Flash…** and **Flash now**. The log ends with
+**Done.**, and afterwards the device list shows which version this PC flashed. The remote must be stopped (not playing). This replaces the OSSM firmware the remote
 came with (see [Going back](#going-back-to-the-ossm-firmware)).
 
 **3. Fill in the settings the remote gets** (**M5 remote** tab), then press **Save settings**:
@@ -97,7 +99,8 @@ came with (see [Going back](#going-back-to-the-ossm-firmware)).
   remote will create. The **channel** can stay at 6; try 1 or 11 if it's unreliable where you are.
 - **House Wi-Fi:** your home network's name and password. It's used in house mode, and to send a box back to the
   house network.
-- **Boxes the remote can drive:** press **Add a box** while the box is plugged in and it fills in the MAC itself.
+- **Boxes the remote can drive:** with the box plugged in and detected, the button reads **Add FOC-Stim (COM…)**:
+  press it and the MAC is filled in. (With no box on USB it adds an empty row to type the MAC into.)
   Give the box a name; that's what the remote shows. The **House address** is only needed in house mode (the box's
   IP address on your network).
 - **Also sent:** the safety limits set on the PC (current cap, slow start, deadman). The remote enforces them, and
@@ -116,8 +119,16 @@ Wi-Fi** undoes it. The box's output never starts during this.
 
 ![Box Wi-Fi: join the remote's Wi-Fi, or go back to the house Wi-Fi](docs/images/hub-box-wifi.png)
 
-**6. Use it.** Unplug everything. Switch the **remote on first, then the box**, pick the box in the remote's
-options, choose a pattern, turn the box's own knob low, and press the MX button to start. The PC can be off.
+**6. Use it.** The PC can be off from here on.
+1. Unplug everything. Switch the **remote on first, then the box**. The remote's screen shows when the box is
+   connected.
+2. With more than one box: press **knob 4** for the options, move to the *Box* line with **knob 1**, and press
+   **knob 1** to pick the box. Press **knob 4** to go back.
+3. Press **knob 1** for the pattern list, turn it to choose, press to pick.
+4. Turn the **box's own knob low**, and put the electrodes on.
+5. Press the **MX button** to start. **Level A** (knob 2) and **Level B** (knob 3) start at zero: raise them
+   slowly. **Knob 1** is the master, **knob 4** is MA.
+6. The **MX button** stops, any time.
 
 ## Doing it yourself, without the hub
 
