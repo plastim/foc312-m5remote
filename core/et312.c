@@ -426,6 +426,7 @@ void et312_engine_init(et312_engine_t *e, uint64_t seed) {
     e->vm.mem[0x1F4] = (uint8_t)e->power;
     et312_set_ma(e, 0.5);
     e->mode = 0;
+    e->v_prev = -1;
 }
 
 void et312_set_block(et312_engine_t *e, int idx, const uint8_t *code, uint16_t len) {
@@ -447,6 +448,7 @@ bool et312_is_builtin(int mode) {
 
 void et312_silent(et312_engine_t *e) {
     e->mode = 0;
+    e->variant = 0;
     e->routine_loaded = false;
     et312_vm_reset_defaults(&e->vm);
     et312_vm_load_block(&e->vm, 0);
@@ -478,13 +480,24 @@ static void random1_pick(et312_engine_t *e) {
     after_select(e);
 }
 
+static uint32_t clock_of(const et312_engine_t *e) { return e->vm.tick_count + e->frozen; }
+
 int et312_set_mode(et312_engine_t *e, int mode) {
     if (!e->builtins_available && et312_is_builtin(mode)) return ET_ERR_NO_BLOCK;
     if (et312_is_builtin(mode)) e->routine_loaded = false;
     e->mode = mode;
+    /* a PlaStim variant plays its base mode's own program; only the clock differs (et312_step) */
+    int base = mode == ET_CLIMB_SLOW || mode == ET_CLIMB_HOLD ? ET_CLIMB : mode;
+    e->variant = mode == ET_CLIMB_SLOW ? 1 : mode == ET_CLIMB_HOLD ? 2 : 0;
+    e->v_start = clock_of(e);
+    e->v_prev = -1;
+    e->v_top = 0;
+    e->v_div = 0;
+    e->v_hold = 0;
+    e->v_held = false;
     e->vm.mem[0x74] = 0;
     e->vm.ma_override_r2 = -1;
-    et312_select_mode(&e->vm, e->mode, e->split_a, e->split_b, e->user_start);
+    et312_select_mode(&e->vm, base, e->split_a, e->split_b, e->user_start);
     after_select(e);
     if (e->mode == ET_RANDOM1) random1_pick(e);
     return e->vm.error;
@@ -573,13 +586,53 @@ void et312_frame(et312_engine_t *e, et312_frame_t *out) {
     } else if (ctrl & 0x04) {
         out->phase_mode = ET_PHASE_INTERLEAVED;
     }
-    out->tick = e->vm.tick_count;
+    out->tick = clock_of(e);
     out->mode = (e->mode == ET_RANDOM1 && m[0x74] > 1) ? m[0x74] : e->mode;
     out->ma_value = m[0x20D];
     out->ctrl_flags = (uint8_t)ctrl;
 }
 
+/* ET312Engine._variant_advance, exactly: Climb counts channel A's frequency register ($ae) down from its start to its
+ * minimum ($af) in steps of $b2 (-1 / -2 / -4); its at-min action jumps it back up (the drop). slow finish: the last
+ * 10 % of the register's travel at 1/3 speed; peak hold: the VM pauses at the climb's last value for a quarter of
+ * that climb's ticks. Returns false when the VM should not advance on this tick. */
+static bool variant_advance(et312_engine_t *e) {
+    const uint8_t *m = e->vm.mem;
+    int f = m[0xAE], fmin = m[0xAF];
+    int step = m[0xB2] >= 128 ? (int)m[0xB2] - 256 : (int)m[0xB2];
+    if (e->v_prev < 0 || f > e->v_prev + 20) {           /* a new climb (mode start, or the drop just happened) */
+        e->v_start = clock_of(e);
+        e->v_top = f;
+        e->v_held = false;
+        e->v_hold = 0;
+        e->v_div = 0;
+    }
+    e->v_prev = f;
+    if (step >= 0) return true;                          /* not climbing: no change */
+    if (e->variant == 1) {
+        if (f <= fmin + 0.10 * (double)(e->v_top - fmin)) {
+            e->v_div = (e->v_div + 1) % 3;
+            return e->v_div == 0;
+        }
+        return true;
+    }
+    if (e->variant == 2) {
+        if (e->v_hold > 0) { e->v_hold--; return false; }
+        if (!e->v_held && f < fmin - step) {             /* the last value before the drop: hold it */
+            e->v_held = true;
+            e->v_hold = (clock_of(e) - e->v_start + 2) / 4;   /* a quarter of the climb, rounded */
+            if (e->v_hold > 0) { e->v_hold--; return false; }
+        }
+    }
+    return true;
+}
+
 void et312_step(et312_engine_t *e, et312_frame_t *out) {
+    if (e->variant && !variant_advance(e)) {
+        e->frozen++;                                     /* the VM holds still this tick; the output repeats */
+        et312_frame(e, out);
+        return;
+    }
     et312_vm_tick(&e->vm);
     if (e->vm.tick_count % MASTER_MSB_TICKS == 0) {
         e->master_msb++;

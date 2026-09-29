@@ -24,7 +24,9 @@ enum {
     ET_WAVES = 0x76, ET_STROKE, ET_CLIMB, ET_COMBO, ET_INTENSE, ET_RHYTHM,
     ET_AUDIO1, ET_AUDIO2, ET_AUDIO3, ET_SPLIT, ET_RANDOM1, ET_RANDOM2,
     ET_TOGGLE, ET_ORGASM, ET_TORMENT, ET_PHASE1, ET_PHASE2, ET_PHASE3,
-    ET_USER1 = 0x88, ET_USER2 = 0x89, ET_USER3 = 0x90, ET_USER4, ET_USER5, ET_USER6, ET_USER7
+    ET_USER1 = 0x88, ET_USER2 = 0x89, ET_USER3 = 0x90, ET_USER4, ET_USER5, ET_USER6, ET_USER7,
+    /* PlaStim variants of Climb (engine.py): Climb's own program, the VM clock slowed or paused */
+    ET_CLIMB_SLOW = 0xF0, ET_CLIMB_HOLD = 0xF1
 };
 
 enum { ET_OK = 0, ET_ERR_NO_BLOCK, ET_ERR_BAD_OPCODE, ET_ERR_RANDOM_RANGE, ET_ERR_NO_USER_START, ET_ERR_BAD_MODE };
@@ -80,6 +82,12 @@ typedef struct {
     bool skip_mode_ramp;     /* start every mode at full ramp (default: the box's ~3.2 s ramp) */
     double level_a, level_b;
     uint8_t master_msb;
+    /* PlaStim Climb variants (ET312Engine._variant_advance): 0 none, 1 slow finish, 2 peak hold */
+    int variant;
+    uint32_t frozen;         /* engine ticks the VM did not advance (frame tick = VM ticks + this) */
+    uint32_t v_start, v_hold;
+    int v_prev, v_top, v_div;
+    bool v_held;
 } et312_engine_t;
 
 /* ---- VM ---- */

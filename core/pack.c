@@ -16,7 +16,7 @@ static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); 
 static uint32_t rd32(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
 
 static bool valid_mode(int m) {
-    return m >= ET_WAVES && m <= ET_PHASE3;
+    return (m >= ET_WAVES && m <= ET_PHASE3) || m == ET_CLIMB_SLOW || m == ET_CLIMB_HOLD;
 }
 
 /* walk one entry from `pos` (bounded by `end`), filling `out` if given; returns the next position or 0 on error */
