@@ -10,9 +10,9 @@ PlaStim's decisions from the 2026-09-28 conversation. Nothing is built yet. Name
   | Control | Encoder / pins | Clockwise | Push |
   |---|---|---|---|
   | Knob 1 (master) | enc1, CLK 5 / DT 9 | counts up | pin 8, high = pressed |
-  | Knob 2 (MA) | enc2, 18 / 17 | counts up | - |
-  | Knob 3 (level ch 1 wires) | enc3, 1 / 2 | counts up | - |
-  | Knob 4 (level ch 2 wires) | enc4, 7 / 6 | counts up | pin 14, high = pressed |
+  | Knob 2 (level A, position 1's wires) | enc2, 18 / 17 | counts up | - |
+  | Knob 3 (level B, position 2's wires) | enc3, 1 / 2 | counts up | - |
+  | Knob 4 (MA) | enc4, 7 / 6 | counts up | pin 14, high = pressed |
   | MX button | - | - | pin 10, high = pressed |
   Half-quadrature counting: 2 counts per detent. Directions confirmed by PlaStim on the app: all four count up clockwise.
 - **Power button (CoreS3):** a short press turns it on; a 6 s hold turns the power chip off. After that hold, even on
@@ -30,20 +30,22 @@ PlaStim's decisions from the 2026-09-28 conversation. Nothing is built yet. Name
 |---|---|---|---|
 | Knob 1 turn | master volume | scroll | move the highlight |
 | Knob 1 press | open patterns | pick | toggle / next for the highlighted item |
-| Knob 2 turn | sensation (the ET-312 MA knob) | jump 10 | pulse shape, round the list (whatever is highlighted) |
-| Knob 3 turn | level of wires in position 1 | - | position 1's wires: every pair, both ways |
-| Knob 4 turn | level of wires in position 2 | - | position 2's wires: every pair, both ways |
+| Knob 2 turn | level A (wires in position 1) | jump 10 | position 1's wires: every pair, both ways |
+| Knob 3 turn | level B (wires in position 2) | - | position 2's wires: every pair, both ways |
+| Knob 4 turn | MA (Multi Adjust, the ET-312 knob) | - | pulse shape, round the list (whatever is highlighted) |
 | Knob 4 press | open options | back | back |
 | MX button | start / stop | start / stop | start / stop |
 
 - Output keeps running in the pattern and options screens, but **in the menus no knob touches the output**: master,
   MA and the levels hold (PlaStim, 2026-09-28: "in the menus the knobs shouldn't control the volumes"). STOP always
   works, and the menus fall back to the run screen after 20 s untouched.
-- **Levels stay with the wires.** Channel swap moves the *patterns* between the wire pairs; knob 3 always sets the
-  wires in position 1, knob 4 position 2.
+- **Levels stay with the wires.** Channel swap moves the *patterns* between the wire pairs; knob 2 always sets the
+  wires in position 1, knob 3 position 2.
 - Levels 0-100 in 1 % steps. No ET-312 Power level and no Advanced menu on the remote (PlaStim: not needed).
 - History: first MA on knob 1 and master on knob 2; PlaStim moved master to knob 1 and MA to knob 2 after first use
-  (the bars on screen follow knob order), then wanted knob 1 back as the list scroller.
+  (the bars on screen follow knob order), then wanted knob 1 back as the list scroller. 2026-09-29 (PlaStim): knobs
+  1-4 = master, level A, level B, MA (MA on 4, under its upright bar on the right edge); in the options 2 / 3 step
+  position 1's / 2's wires and 4 the pulse shape, so A and B stay on knobs 2 and 3 everywhere.
 
 ## Options screen
 A picture (PlaStim: "make polarity, wires and swap graphical"): the four pads in a row, position 1's wires as an orange

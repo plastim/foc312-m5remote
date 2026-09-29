@@ -30,8 +30,9 @@ You can switch between the two any time. The box's own knob is the master limit 
 |---|---|---|---|
 | Knob 1 turn | master volume | scroll | move the highlight |
 | Knob 1 press | open patterns | pick | toggle / next |
-| Knob 2 turn | MA (Multi Adjust: the pattern's speed and feel, as on the ET-312) | jump 10 | pulse shape |
-| Knob 3 / 4 turn | level of each wire pair | - | that pair's wires, both directions |
+| Knob 2 turn | Level A (the wires in position 1) | jump 10 | A's wires, both directions |
+| Knob 3 turn | Level B (the wires in position 2) | - | B's wires, both directions |
+| Knob 4 turn | MA (Multi Adjust: the pattern's speed and feel, as on the ET-312) | - | pulse shape |
 | Knob 4 press | options | back | back |
 | MX button | start / **STOP** | start / STOP | start / STOP |
 | Power button | short press: switch off (output stopped first); press the MX button to switch on | | |
@@ -42,7 +43,7 @@ remote's master is a share of it.
 ### Why flip the polarity?
 
 Each wire pair has a direction: which pad is negative during the first, stronger half of every pulse (on the options
-screen, knobs 3 and 4 step through each pair's wires in both directions). **The sensation is strongest under the pad
+screen, knobs 2 and 3 step through each pair's wires in both directions). **The sensation is strongest under the pad
 that is negative in that first half.** So flipping a pair's polarity moves the focus from one pad to the other
 without moving anything:
 - when one pad feels sharp and the other barely at all, a flip swaps them;

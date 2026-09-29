@@ -126,54 +126,61 @@ static void move_cursor(ctrl_t *c, int by, double now) {
     c->nav_t = now;
 }
 
+/* PlaStim, 2026-09-29: knobs 1-4 = master, level A (position 1's wires), level B (position 2's), MA on the run screen;
+ * options: 1 the highlight, 2 / 3 position 1's / 2's wires, 4 the pulse shape (A and B stay on knobs 2 and 3). */
+static void knob_shape(ctrl_t *c, int detents, double now) {
+    /* the pulse shape, whatever is highlighted, one shape per detent, round the list; the highlight moves to Shape */
+    int shape = c->set.shape;
+    for (int n = detents < 0 ? -detents : detents; n > 0; n--) shape = step_shape(c, shape, detents > 0 ? 1 : -1, true);
+    c->cursor = OPT_SHAPE;
+    c->nav_t = now;
+    if (shape != c->set.shape) { c->set.shape = shape; foc312_set_shape(&c->foc, shape, &c->saf, now); }
+}
+
+static void knob_wires(ctrl_t *c, int p, int detents, double now) {
+    /* this position's wires, every pair both ways */
+    int r = position_route(c, p), k = 0;
+    for (int i = 0; i < 2 * CTRL_N_ROUTES; i++)
+        if (DIRECTED[i] == r) k = i;
+    int steps = (detents < 0 ? -detents : detents) % (2 * CTRL_N_ROUTES);
+    k = (k + (detents > 0 ? steps : 2 * CTRL_N_ROUTES - steps)) % (2 * CTRL_N_ROUTES);
+    c->set.wire_route[p] = DIRECTED[k & ~1];
+    c->set.reversed[p] = (k & 1) != 0;
+    c->cursor = p ? OPT_WIRES_2 : OPT_WIRES_1;
+    c->nav_t = now;
+    apply_routing(c, now);
+}
+
+static void knob_level(ctrl_t *c, int p, int detents) {
+    c->level_target[p] = clampi(c->level_target[p] + detents, 0, 100);
+    if (c->level_target[p] < c->level_applied[p]) c->level_applied[p] = c->level_target[p];   /* down: instant */
+}
+
 void ctrl_knob(ctrl_t *c, ctrl_knob_t knob, int detents, double now) {
     if (!detents) return;
-    switch (knob) {
-    case KNOB_1:
-        if (c->screen == SCREEN_RUN) {
+    if (c->screen == SCREEN_RUN) {
+        switch (knob) {
+        case KNOB_1:
             c->master_target = clampi(c->master_target + detents, 0, 100);
             if (c->master_target < c->master_applied) c->master_applied = c->master_target;      /* down: instant */
-        } else {
-            move_cursor(c, detents, now);
-        }
-        break;
-    case KNOB_2:
-        if (c->screen == SCREEN_RUN) {
+            break;
+        case KNOB_2: knob_level(c, 0, detents); break;
+        case KNOB_3: knob_level(c, 1, detents); break;
+        case KNOB_4:
             c->ma_steps = clampi(c->ma_steps + detents, 0, 100);
             foc312_set_ma(&c->foc, c->ma_steps / 100.0);
-        } else if (c->screen == SCREEN_PATTERNS) {
-            move_cursor(c, 10 * detents, now);
-        } else {
-            /* options: knob 2 is the pulse shape, whatever is highlighted (PlaStim: "make it change the wave / cycle
-             * through them"), one shape per detent, round the list; the highlight moves to Shape to show it */
-            int shape = c->set.shape;
-            for (int n = detents < 0 ? -detents : detents; n > 0; n--) shape = step_shape(c, shape, detents > 0 ? 1 : -1, true);
-            c->cursor = OPT_SHAPE;
-            c->nav_t = now;
-            if (shape != c->set.shape) { c->set.shape = shape; foc312_set_shape(&c->foc, shape, &c->saf, now); }
-        }
-        break;
-    case KNOB_3:
-    case KNOB_4: {
-        int p = knob == KNOB_3 ? 0 : 1;
-        if (c->screen == SCREEN_OPTIONS) {         /* this position's wires, every pair both ways */
-            int r = position_route(c, p), k = 0;
-            for (int i = 0; i < 2 * CTRL_N_ROUTES; i++)
-                if (DIRECTED[i] == r) k = i;
-            int steps = (detents < 0 ? -detents : detents) % (2 * CTRL_N_ROUTES);
-            k = (k + (detents > 0 ? steps : 2 * CTRL_N_ROUTES - steps)) % (2 * CTRL_N_ROUTES);
-            c->set.wire_route[p] = DIRECTED[k & ~1];
-            c->set.reversed[p] = (k & 1) != 0;
-            c->cursor = p ? OPT_WIRES_2 : OPT_WIRES_1;
-            c->nav_t = now;
-            apply_routing(c, now);
             break;
         }
-        if (c->screen != SCREEN_RUN) break;        /* the pattern list: no job */
-        c->level_target[p] = clampi(c->level_target[p] + detents, 0, 100);
-        if (c->level_target[p] < c->level_applied[p]) c->level_applied[p] = c->level_target[p];
-        break;
-    }
+    } else if (c->screen == SCREEN_PATTERNS) {
+        if (knob == KNOB_1) move_cursor(c, detents, now);
+        else if (knob == KNOB_2) move_cursor(c, 10 * detents, now);
+    } else {                                        /* options: no knob touches the output */
+        switch (knob) {
+        case KNOB_1: move_cursor(c, detents, now); break;
+        case KNOB_2: knob_wires(c, 0, detents, now); break;
+        case KNOB_3: knob_wires(c, 1, detents, now); break;
+        case KNOB_4: knob_shape(c, detents, now); break;
+        }
     }
 }
 

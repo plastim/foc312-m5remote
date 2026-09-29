@@ -6,13 +6,13 @@
  *  - STOP always wins: the MX button while armed = instant zero; it never toggles back on. Start (arm, slow start)
  *    needs the link RUNNING, no fault, and CTRL_RESTART_BLOCK_S since the last stop.
  *  - Levels and master rise at most CTRL_RISE_STEPS_PER_S steps a second however fast a knob spins; down is instant.
- *  - Levels stay with the wires: knob 3 sets the wires in position 1, knob 4 position 2; a channel swap moves the
+ *  - Levels stay with the wires: knob 2 sets the wires in position 1, knob 3 position 2; a channel swap moves the
  *    patterns between the positions, not the levels.
  *  - A fault (trip, lost link) disarms and zeroes both levels; levels are 0 at boot.
- *  - The knobs (PlaStim, 2026-09-28). Run screen: 1 master (press: patterns), 2 MA, 3-4 levels (4's press: options).
- *    In the menus no knob touches the output (master, MA and levels hold; STOP always works): patterns - 1 scrolls
- *    (press picks), 2 jumps ten; options - 1 moves the highlight (press toggles / steps it), 2 cycles the pulse
- *    shape, 3 and 4 step their wires through every pair in both directions. 4's press: back.
+ *  - The knobs (PlaStim, 2026-09-29). Run screen: 1 master (press: patterns), 2 level A, 3 level B, 4 MA (press:
+ *    options). In the menus no knob touches the output (master, MA and levels hold; STOP always works): patterns -
+ *    1 scrolls (press picks), 2 jumps ten; options - 1 moves the highlight (press toggles / steps it), 2 and 3 step
+ *    position 1's / 2's wires through every pair in both directions, 4 cycles the pulse shape. 4's press: back.
  */
 #ifndef CTRL_H
 #define CTRL_H

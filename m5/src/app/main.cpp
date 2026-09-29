@@ -32,7 +32,7 @@ extern "C" {
 
 // ---- the board (measured with the hwtest firmware, notes/m5-remote.md) ----------------------------------------
 static const int ENC_PINS[4][2] = {{5, 9}, {18, 17}, {1, 2}, {7, 6}};   // knobs 1..4 as printed on the remote
-// what each knob does on each screen is remote/core/ctrl.h's business (knob 1 master / scroll, 2 MA / change, 3-4 levels)
+// what each knob does on each screen is remote/core/ctrl.h's business (knob 1 master / scroll, 2-3 levels A / B, 4 MA)
 static const int ENC_DIR[4] = {+1, +1, +1, +1};                          // clockwise = up (checked by PlaStim)
 static const int PIN_MX = 10, PIN_PUSH1 = 8, PIN_PUSH4 = 14;             // high = pressed
 static const uint32_t DEBOUNCE_MS = 30;
@@ -534,7 +534,7 @@ static void draw_run() {
         canvas.setTextColor(sc.set.pads[i] ? EL_COL[i] : C_OFF);
         canvas.drawString(d, 272 + i * 11, 29);
     }
-    // MA (knob 2): upright on the right edge, so it never reads as another volume (PlaStim). Label and number on top.
+    // MA (knob 4): upright on the right edge, over its knob, so it never reads as another volume (PlaStim). Label and number on top.
     {
         const int mx = 298, my = 64, mw = 16, mh = 118;
         canvas.setFont(&fonts::Font0);
@@ -712,7 +712,7 @@ static void draw_list(const char *title, int count, int cursor, bool patterns) {
 }
 
 // ---- options: the wiring as a picture ------------------------------------------------------------------------
-// Four pads in a row; position 1's wires (orange, knob 3) as a bracket above them, position 2's (cyan, knob 4)
+// Four pads in a row; position 1's wires (orange, knob 2) as a bracket above them, position 2's (cyan, knob 3)
 // below, with an arrow for the polarity and the pattern (A / B) each plays. The highlight is knob 1's cursor.
 static const int PAD_X[4] = {52, 124, 196, 268}, PAD_Y = 88, PAD_R = 15;
 
@@ -756,7 +756,7 @@ static void draw_options() {
         uint16_t col = off ? C_OFF : (p ? C_B : C_A);
         bool plays_a = sc.set.swapped ? p == 1 : p == 0;
         wire_bracket(r, p == 0, col, cur == (p ? OPT_WIRES_2 : OPT_WIRES_1), cur == (p ? OPT_POLARITY_2 : OPT_POLARITY_1));
-        snprintf(s, sizeof s, "knob %d: %d->%d%s  plays %c%s", 3 + p, r / 10, r % 10,
+        snprintf(s, sizeof s, "knob %d: %d->%d%s  plays %c%s", 2 + p, r / 10, r % 10,
                  sc.set.reversed[p] ? " (reversed)" : "", plays_a ? 'A' : 'B', off ? "  pad off" : "");
         canvas.setTextColor(col);
         canvas.drawString(s, 6, p ? 138 : 24);
