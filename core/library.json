@@ -1,0 +1,10 @@
+{
+  "name": "stim-remote-core",
+  "version": "0.1.0",
+  "description": "The M5 remote's portable C core: ET-312 engine, foc312 fork view, safety stack, box link, pattern packs, USB loader, controller. Tested on the host against the Python engine (tests/test_remote_*.py).",
+  "build": {
+    "srcFilter": ["+<*.c>", "+<nanopb/*.c>", "+<proto/*.c>"],
+    "flags": ["-I nanopb", "-I proto"],
+    "includeDir": "."
+  }
+}

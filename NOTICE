@@ -1,0 +1,9 @@
+Required Notice: Copyright PlaStim (https://plastim.net)
+
+This firmware is licensed under the PolyForm Noncommercial License 1.0.0 (LICENSE.md).
+
+Third-party components keep their own licenses:
+- core/nanopb/: nanopb by Petteri Aimonen, zlib license (core/nanopb/LICENSE.txt).
+- The OSSM M5 Remote hardware is ortlof's (https://github.com/ortlof/OSSM-M5-Remote, CC BY-SA 4.0). This firmware
+  is written from scratch; only facts about the hardware (pin numbers) are used.
+- M5Unified, ESP32Encoder and ArduinoJson are fetched at build time under their own licenses (m5/platformio.ini).
