@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="300" viewBox="0 0 920 300" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="919" height="299" rx="14" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- direct -->
+  <text x="30" y="44" font-size="19" font-weight="700" fill="#1a7f37">The remote's own Wi-Fi (recommended)</text>
+  <text x="30" y="68" font-size="13.5" fill="#57606a">The remote makes a small network of its own; the box joins it.</text>
+  <rect x="30" y="100" width="160" height="70" rx="10" fill="#f3edff" stroke="#7c4dcc" stroke-width="1.5"/>
+  <text x="110" y="128" font-size="15" font-weight="600" fill="#1f2328" text-anchor="middle">M5 remote</text>
+  <text x="110" y="150" font-size="12" fill="#57606a" text-anchor="middle">network "stim-remote"</text>
+  <path d="M192,135 C225,115 250,155 283,135" fill="none" stroke="#1a7f37" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="238" y="120" font-size="12" fill="#1a7f37" text-anchor="middle">one hop</text>
+  <rect x="287" y="100" width="140" height="70" rx="10" fill="#eaf0ff" stroke="#3b6cf0" stroke-width="1.5"/>
+  <text x="357" y="140" font-size="15" font-weight="600" fill="#1f2328" text-anchor="middle">FOC-Stim box</text>
+  <text x="30" y="210" font-size="13.5" fill="#1f2328">Fast and steady (measured: 33 ms average, 80 ms worst).</text>
+  <text x="30" y="232" font-size="13.5" fill="#1f2328">Works anywhere, no house Wi-Fi needed.</text>
+  <text x="30" y="262" font-size="13.5" font-weight="700" fill="#1f2328">Switch the remote on first, then the box.</text>
+
+  <line x1="460" y1="30" x2="460" y2="270" stroke="#d0d7de" stroke-dasharray="5 5"/>
+
+  <!-- house -->
+  <text x="490" y="44" font-size="19" font-weight="700" fill="#1f2328">The house Wi-Fi</text>
+  <text x="490" y="68" font-size="13.5" fill="#57606a">Remote and box both join your home network.</text>
+  <rect x="490" y="100" width="110" height="70" rx="10" fill="#f3edff" stroke="#7c4dcc" stroke-width="1.5"/>
+  <text x="545" y="140" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">M5 remote</text>
+  <path d="M602,135 C620,120 635,150 652,135" fill="none" stroke="#9a6700" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="656" y="100" width="100" height="70" rx="10" fill="#fff8e5" stroke="#9a6700" stroke-width="1.5"/>
+  <text x="706" y="132" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">house</text>
+  <text x="706" y="150" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">router</text>
+  <path d="M758,135 C776,120 791,150 808,135" fill="none" stroke="#9a6700" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="812" y="100" width="90" height="70" rx="10" fill="#eaf0ff" stroke="#3b6cf0" stroke-width="1.5"/>
+  <text x="857" y="132" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">FOC-Stim</text>
+  <text x="857" y="150" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">box</text>
+  <text x="490" y="210" font-size="13.5" fill="#1f2328">Two hops through a router that is busy with</text>
+  <text x="490" y="232" font-size="13.5" fill="#1f2328">everything else: can lag (100 ms+, spikes of 1 s).</text>
+  <text x="490" y="262" font-size="13.5" fill="#57606a">Fine for trying it out.</text>
+</svg>

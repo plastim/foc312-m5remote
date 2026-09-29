@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="330" viewBox="0 0 920 330" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="919" height="329" rx="14" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- way 1 -->
+  <text x="30" y="44" font-size="20" font-weight="700" fill="#1f2328">1 · PC only</text>
+  <text x="30" y="68" font-size="14" fill="#57606a">The PC app plays the patterns. No remote needed.</text>
+  <rect x="30" y="120" width="150" height="64" rx="10" fill="#f6f8fa" stroke="#57606a" stroke-width="1.5"/>
+  <text x="105" y="148" font-size="15" font-weight="600" fill="#1f2328" text-anchor="middle">PC</text>
+  <text x="105" y="168" font-size="12.5" fill="#57606a" text-anchor="middle">foc312-engine</text>
+  <line x1="182" y1="152" x2="268" y2="152" stroke="#57606a" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="225" y="142" font-size="12.5" fill="#57606a" text-anchor="middle">USB</text>
+  <rect x="272" y="120" width="150" height="64" rx="10" fill="#eaf0ff" stroke="#3b6cf0" stroke-width="1.5"/>
+  <text x="347" y="148" font-size="15" font-weight="600" fill="#1f2328" text-anchor="middle">FOC-Stim box</text>
+  <text x="347" y="168" font-size="12.5" fill="#57606a" text-anchor="middle">foc312 firmware</text>
+  <text x="30" y="230" font-size="13.5" fill="#1f2328">Everything on screen: the player, levels, routing,</text>
+  <text x="30" y="250" font-size="13.5" fill="#1f2328">pulse shapes. STOP with the Pause key.</text>
+
+  <line x1="460" y1="30" x2="460" y2="300" stroke="#d0d7de" stroke-dasharray="5 5"/>
+
+  <!-- way 2 -->
+  <text x="490" y="44" font-size="20" font-weight="700" fill="#1f2328">2 · With the M5 remote</text>
+  <text x="490" y="68" font-size="14" fill="#57606a">The PC is only needed to set the remote up.</text>
+  <text x="490" y="104" font-size="13" font-weight="700" fill="#7c4dcc">ONCE (and after changes)</text>
+  <rect x="490" y="114" width="110" height="46" rx="9" fill="#f6f8fa" stroke="#57606a" stroke-width="1.5"/>
+  <text x="545" y="142" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">PC</text>
+  <line x1="602" y1="137" x2="728" y2="137" stroke="#57606a" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="665" y="128" font-size="12" fill="#57606a" text-anchor="middle">USB: flash, load</text>
+  <text x="665" y="154" font-size="12" fill="#57606a" text-anchor="middle">patterns &amp; settings</text>
+  <rect x="732" y="114" width="150" height="46" rx="9" fill="#f3edff" stroke="#7c4dcc" stroke-width="1.5"/>
+  <text x="807" y="142" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">M5 remote</text>
+
+  <text x="490" y="204" font-size="13" font-weight="700" fill="#7c4dcc">EVERY SESSION (PC can be off)</text>
+  <rect x="490" y="214" width="150" height="46" rx="9" fill="#f3edff" stroke="#7c4dcc" stroke-width="1.5"/>
+  <text x="565" y="242" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">M5 remote</text>
+  <path d="M642,237 C670,222 700,252 728,237" fill="none" stroke="#57606a" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="686" y="226" font-size="12" fill="#57606a" text-anchor="middle">Wi-Fi</text>
+  <rect x="732" y="214" width="150" height="46" rx="9" fill="#eaf0ff" stroke="#3b6cf0" stroke-width="1.5"/>
+  <text x="807" y="242" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">FOC-Stim box</text>
+  <text x="490" y="292" font-size="13.5" fill="#1f2328">The remote plays the patterns itself, straight to the box.</text>
+</svg>
