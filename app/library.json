@@ -1,0 +1,9 @@
+{
+  "name": "stim-remote-app",
+  "version": "0.1.0",
+  "description": "The remote's app, shared by every board (the M5 remote, the RADR hardware): screens, box link, USB loader, the safety glue. The board brings knobs, buttons, display and serial (app.h).",
+  "build": {
+    "srcFilter": ["+<*.cpp>"],
+    "includeDir": "."
+  }
+}

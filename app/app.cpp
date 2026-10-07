@@ -1,6 +1,8 @@
-// The M5 remote: foc312 on the OSSM M5 Remote, driving a FOC-Stim (fork firmware) over Wi-Fi (notes/m5-remote.md).
-// Everything with logic in it is remote/core (C, tested on the host against the Python engine); this file is the
-// hardware glue: knobs and buttons, the screen, LittleFS, the USB loader, Wi-Fi and the box's TCP link.
+// The remote's app: foc312 on a handheld, driving a FOC-Stim (fork firmware) over Wi-Fi. Shared by every board: the
+// M5 remote (m5/: the OSSM M5 Remote, CoreS3) and the RADR hardware (radr/), so a fix lands once. Everything with
+// logic in it is core/ (C, tested on the host against the Python engine); this file is the glue: the screens,
+// LittleFS, the USB loader, Wi-Fi and the box's TCP link. The board (app.h: board_*) has the knobs and buttons, the
+// display, the serial port and its own extras.
 //
 // Tasks (PlaStim, 2026-09-28: Waves felt chunky - drawing the screen held up the engine for tens of ms at a time):
 //   control  every 16 ms, high priority: knobs, buttons, engine, safety, the box link's reads and writes, traces.
@@ -9,18 +11,17 @@
 //            slow connect never holds up control.
 //   loop     Arduino's loop: the USB loader, saving settings, and the screen, drawn from a snapshot taken under the
 //            lock in microseconds.
+#include "app.h"
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ESP32Encoder.h>
 #include <LittleFS.h>
-#include <M5Unified.h>
 #include <WiFi.h>
 #include <errno.h>
+#include <esp_system.h>
 #include <esp_netif.h>
 #include <esp_netif_sta_list.h>
 #include <esp_wifi.h>
-#include <esp_sleep.h>
-#include <driver/rtc_io.h>
 #include <lwip/sockets.h>
 
 extern "C" {
@@ -30,12 +31,7 @@ extern "C" {
 #include "pack.h"
 }
 
-// ---- the board (measured with the hwtest firmware, notes/m5-remote.md) ----------------------------------------
-static const int ENC_PINS[4][2] = {{5, 9}, {18, 17}, {1, 2}, {7, 6}};   // knobs 1..4 as printed on the remote
-// what each knob does on each screen is remote/core/ctrl.h's business (knob 1 master / scroll, 2-3 levels A / B, 4 MA)
-static const int ENC_DIR[4] = {+1, +1, +1, +1};                          // clockwise = up (checked by PlaStim)
-static const int PIN_MX = 10, PIN_PUSH1 = 8, PIN_PUSH4 = 14;             // high = pressed
-static const uint32_t DEBOUNCE_MS = 30;
+// ---- timing (the knobs and buttons are the board's: app.h) ---------------------------------------------------
 static const uint32_t CONTROL_PERIOD_MS = 16;
 #define HIST_N 200                            // trace: ~10 s at one sample per 3 control ticks
 
@@ -62,9 +58,7 @@ static ctrl_settings_t saved_set;
 static boxlink_t blink;
 static loader_t ldr;
 static WiFiClient tcp;
-static ESP32Encoder enc[4];
-static long enc_base[4];
-static M5Canvas canvas(&M5.Display);
+static AppCanvas canvas(&board_display());
 
 static char last_fault[120] = "";
 static float hist[2][HIST_N];                 // pattern intensity per wire position, 0..1 (gate and pad included)
@@ -133,7 +127,7 @@ static bool load_config() {
 // it (stimengine.remote pair-box): one hop through the air instead of two and no busy house AP in between (PlaStim's
 // Living-room AP measured 78 % channel use and ~69 % retries to the remote, 2026-09-28).
 static void wifi_start() {
-    if (!cfg.ok) return;
+    if (!cfg.ok || !board_may_drive()) return;
     WiFi.disconnect();
     if (cfg.direct) {
         WiFi.mode(WIFI_AP);
@@ -208,6 +202,7 @@ static void start_controller() {
     ctrl_init(&ctl, pack_ok ? &pack : nullptr, have ? &s : nullptr, cfg.nboxes ? cfg.nboxes : 1, now_s(), cfg.slow,
               cfg.dead, cfg.ramp, cfg.cap, cfg.mono, esp_random());
     saved_set = ctl.set;
+    board_controller_ready(&ctl);              // the board's options (the RADR offers its remote check)
 }
 
 // ---- the box link's socket ------------------------------------------------------------------------------------
@@ -280,6 +275,20 @@ static bool l_list(void *, int index, char *name, size_t cap, uint32_t *size) {
     }
     return false;
 }
+// HELLO: what this remote runs on and its ESP32's (base) MAC: the PC knows it by that, whatever its USB says
+static void l_ident(void *, char *buf, size_t cap) {
+    uint8_t m[6] = {0};
+    esp_efuse_mac_get_default(m);
+    snprintf(buf, cap, "board=%s mac=%02x:%02x:%02x:%02x:%02x:%02x", board_name(), m[0], m[1], m[2], m[3], m[4], m[5]);
+}
+
+// the board's request-id range (two remotes on one box tell each other apart: boxlink.h)
+static void link_ids() {
+    uint32_t first = BOXLINK_ID_FIRST, last = BOXLINK_ID_LAST;
+    board_link_ids(&first, &last);
+    boxlink_set_ids(&blink, first, last);
+}
+
 static bool l_reload(void *, char *reason, size_t cap) {
     bool ok = load_config();
     load_pack();
@@ -289,39 +298,11 @@ static bool l_reload(void *, char *reason, size_t cap) {
     txlen = 0;
     boxlink_io_t io = blink.io;
     boxlink_init(&blink, &io, cfg.cap);
+    link_ids();
     start_controller();
     wifi_start();
     reconnect_now = true;
     return true;
-}
-
-// ---- inputs (control task) ------------------------------------------------------------------------------------
-struct Button { int pin; bool state; uint32_t changed; };
-static Button btn_mx = {PIN_MX, false, 0}, btn_p1 = {PIN_PUSH1, false, 0}, btn_p4 = {PIN_PUSH4, false, 0};
-
-static bool pressed(Button &b) {           // debounced rising edge
-    bool v = digitalRead(b.pin) == HIGH;
-    uint32_t ms = millis();
-    if (v != b.state && ms - b.changed > DEBOUNCE_MS) {
-        b.state = v;
-        b.changed = ms;
-        return v;
-    }
-    return false;
-}
-
-static void inputs(double t) {
-    for (int i = 0; i < 4; i++) {
-        long c = enc[i].getCount();
-        long det = (c - enc_base[i]) / 2;     // 2 counts per detent; a bounce mid-detent adds or loses nothing
-        if (det) {
-            enc_base[i] += det * 2;
-            ctrl_knob(&ctl, (ctrl_knob_t)i, (int)det * ENC_DIR[i], t);
-        }
-    }
-    if (pressed(btn_mx)) ctrl_button(&ctl, t);
-    if (pressed(btn_p1)) ctrl_push_knob1(&ctl, t);
-    if (pressed(btn_p4)) ctrl_push_knob4(&ctl, t);
 }
 
 // ---- control task ---------------------------------------------------------------------------------------------
@@ -330,7 +311,12 @@ static void control_step() {
     uint32_t ms = millis();
     double t = now_s();
     int prev_box = ctl.set.box;
-    inputs(t);
+    board_inputs(&ctl, t);                    // the knobs and buttons (the board's) into the controller
+    if (!board_may_drive() && link_live()) {  // the board's hardware check runs: no box meanwhile (it was stopped)
+        tcp.stop();
+        txlen = 0;
+        boxlink_disconnected(&blink, "the remote check is running");
+    }
     if (ctl.set.box != prev_box) {            // the options switched boxes (ctrl already disarmed)
         tcp.stop();
         txlen = 0;
@@ -411,7 +397,7 @@ static void network_task(void *) {
     WiFiClient fresh;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(100));
-        if (!cfg.ok) continue;
+        if (!cfg.ok || !board_may_drive()) continue;
         uint32_t ms = millis();
         if (!cfg.direct && WiFi.status() != WL_CONNECTED) {
             if (ms - wifi_try > 5000) { wifi_try = ms; WiFi.begin(cfg.ssid, cfg.pass); }
@@ -493,6 +479,24 @@ static void bar(int x, int y, int w, int h, float frac, uint16_t col, const char
 
 static const char *trip_short(const char *line, char *buf, size_t cap);
 
+// a board whose right knob has a focus (board_focus >= 0: A, B, MA): tabs on the name row, a frame round what it turns
+static void draw_focus(int focus) {
+    static const char *const TABS[3] = {"A", "B", "MA"};
+    static const int TAB_X[3] = {150, 176, 202}, TAB_W[3] = {24, 24, 30};
+    canvas.setFont(&fonts::Font2);
+    for (int i = 0; i < 3; i++) {
+        bool on = i == focus;
+        canvas.fillRect(TAB_X[i], 29, TAB_W[i], 16, on ? C_BRAND : 0x2124);
+        canvas.setTextColor(on ? TFT_WHITE : (i == 0 ? C_A : i == 1 ? C_B : 0xB5B6));
+        canvas.drawCentreString(TABS[i], TAB_X[i] + TAB_W[i] / 2, 29);
+    }
+    static const int FX[3] = {4, 150, 296}, FY[3] = {61, 61, 44}, FW[3] = {144, 144, 20}, FH[3] = {18, 18, 140};
+    if (focus >= 0 && focus < 3) {
+        canvas.drawRect(FX[focus], FY[focus], FW[focus], FH[focus], C_BRAND);
+        canvas.drawRect(FX[focus] - 1, FY[focus] - 1, FW[focus] + 2, FH[focus] + 2, C_BRAND);
+    }
+}
+
 static void draw_run() {
     char s[96];
     bool armed = sc.saf.armed;
@@ -526,7 +530,14 @@ static void draw_run() {
     pack_entry_t e;
     const char *pname = (sc.set.pattern >= 0 && pack_ok && pack_entry(&pack, sc.set.pattern, &e) == PACK_OK) ? e.name : "(no pattern)";
     canvas.setTextColor(C_FG);
-    canvas.drawString(pname, 6, 29);
+    if (board_focus() >= 0) {                     // the focus tabs follow it on this row
+        char nm[48];
+        strlcpy(nm, pname, sizeof nm);
+        while (strlen(nm) > 1 && canvas.textWidth(nm) > 140) nm[strlen(nm) - 1] = 0;
+        canvas.drawString(nm, 6, 29);
+    } else {
+        canvas.drawString(pname, 6, 29);
+    }
     // pads: the ones marked off are dimmed (a channel routed onto one is silent)
     canvas.drawString("Pads", 234, 29);
     for (int i = 0; i < 4; i++) {
@@ -621,7 +632,7 @@ static void draw_run() {
         canvas.setTextColor(col);
         canvas.drawString(s, 6 + p * 100, 222);
     }
-    snprintf(s, sizeof s, "bat %.0f%% | %d%%", t.battery_soc * 100, M5.Power.getBatteryLevel());   // box | remote
+    snprintf(s, sizeof s, "bat %.0f%% | %d%%", t.battery_soc * 100, board_battery_percent());   // box | remote
     canvas.setTextColor(C_FG);
     canvas.drawRightString(s, 314, 222);
 
@@ -674,6 +685,7 @@ static void draw_run() {
         canvas.setTextColor(TFT_ORANGE);
         canvas.drawString(sc.status, 6, 204);
     }
+    if (board_focus() >= 0) draw_focus(board_focus());
 }
 
 static void draw_list(const char *title, int count, int cursor, bool patterns) {
@@ -689,7 +701,14 @@ static void draw_list(const char *title, int count, int cursor, bool patterns) {
     canvas.setTextColor(C_FG);
     canvas.drawString(title, 6, 30);
     canvas.setTextColor(C_DIM);
-    canvas.drawRightString("1 scroll/pick  2 +10", 314, 30);
+    const char *hint = board_text(BT_LIST);         // what the controls do here (the board's names for them)
+    if (canvas.textWidth(hint) > 314 - 80) {        // a long one: the small font, clear of the heading
+        canvas.setFont(&fonts::Font0);
+        canvas.drawRightString(hint, 314, 34);
+        canvas.setFont(&fonts::Font2);
+    } else {
+        canvas.drawRightString(hint, 314, 30);
+    }
     canvas.drawFastHLine(0, 47, 320, 0x2124);
     int rows = 10, first = cursor - rows / 2;
     if (first > count - rows) first = count - rows;
@@ -748,7 +767,7 @@ static void draw_options() {
     int tx = brand(canvas, 6, 10, 1);
     canvas.setTextColor(C_FG);
     canvas.drawString("Wiring & options", tx + 8, 3);
-    canvas.drawRightString("4 press: back", 314, 3);
+    canvas.drawRightString(board_text(BT_OPTIONS_TITLE), 314, 3);
     for (int p = 0; p < 2; p++) {
         int base = sc.set.wire_route[p];
         int r = sc.set.reversed[p] ? route_reverse(base) : base;
@@ -756,7 +775,7 @@ static void draw_options() {
         uint16_t col = off ? C_OFF : (p ? C_B : C_A);
         bool plays_a = sc.set.swapped ? p == 1 : p == 0;
         wire_bracket(r, p == 0, col, cur == (p ? OPT_WIRES_2 : OPT_WIRES_1), cur == (p ? OPT_POLARITY_2 : OPT_POLARITY_1));
-        snprintf(s, sizeof s, "knob %d: %d->%d%s  plays %c%s", 2 + p, r / 10, r % 10,
+        snprintf(s, sizeof s, "%s: %d->%d%s  plays %c%s", board_text(p ? BT_PAIR_B : BT_PAIR_A), r / 10, r % 10,
                  sc.set.reversed[p] ? " (reversed)" : "", plays_a ? 'A' : 'B', off ? "  pad off" : "");
         canvas.setTextColor(col);
         canvas.drawString(s, 6, p ? 138 : 24);
@@ -788,10 +807,11 @@ static void draw_options() {
     snprintf(s, sizeof s, "Box: %s", cfg.nboxes ? cfg.boxes[sc.set.box].name : "-");
     button(164, 176, 150, s, cur == OPT_BOX);
     button(6, 198, 150, "Back", cur == OPT_BACK);
+    if (ctrl_option_shown(&sc, OPT_DEVICE)) button(164, 198, 150, "Remote check", cur == OPT_DEVICE);   // the board's
     canvas.setFont(&fonts::Font0);
     canvas.setTextColor(C_DIM);
-    canvas.drawString("1: move, press toggles   2: pulse shape", 6, 221);
-    canvas.drawString("3 / 4: wires, every pair both ways", 6, 231);
+    canvas.drawString(board_text(BT_OPTIONS_1), 6, 221);
+    canvas.drawString(board_text(BT_OPTIONS_2), 6, 231);
     canvas.drawRightString("levels hold here", 314, 231);
     canvas.setFont(&fonts::Font2);
 }
@@ -831,6 +851,10 @@ static void draw_fault() {
 }
 
 static void draw() {
+    if (board_draw(canvas)) {                   // the board's own screen (the RADR's remote check)
+        canvas.pushSprite(0, 0);
+        return;
+    }
     canvas.fillScreen(C_BG);
     canvas.setFont(&fonts::Font2);
     if (!cfg.ok || !pack_ok) {
@@ -849,59 +873,51 @@ static void draw() {
     canvas.pushSprite(0, 0);
 }
 
-// ---- main -----------------------------------------------------------------------------------------------------
-void setup() {
-    auto m5cfg = M5.config();
-    M5.begin(m5cfg);
+// ---- main (the board's setup() and loop() call these: app.h) ----------------------------------------------------
+lgfx::LovyanGFX &app_brand(lgfx::LovyanGFX &g, int x, int mid, int scale) {
+    brand(g, x, mid, scale);
+    return g;
+}
+
+void app_setup() {
+    board_begin();
     // screen on and a message first thing: a black screen then only ever means no power (the CoreS3's power chip
     // can leave the ESP32 half-powered after a 6 s power-button hold; a reset press brings it back)
-    M5.Display.setBrightness(160);
-    M5.Display.fillScreen(TFT_BLACK);
-    brand(M5.Display, 38, 100, 3);
-    M5.Display.setFont(&fonts::Font2);
-    M5.Display.setTextColor(0x8410, TFT_BLACK);
-    M5.Display.drawCentreString("remote - starting", 160, 150);
-    Serial.setRxBufferSize(4096);             // the loader sends 1 KB chunks; the default 256 B would overflow
-    Serial.begin(115200);
-    ESP32Encoder::useInternalWeakPullResistors = puType::up;
-    for (int i = 0; i < 4; i++) {
-        enc[i].attachHalfQuad(ENC_PINS[i][0], ENC_PINS[i][1]);
-        enc[i].setCount(0);
-        enc_base[i] = 0;
-    }
-    pinMode(PIN_MX, INPUT);
-    pinMode(PIN_PUSH1, INPUT);
-    pinMode(PIN_PUSH4, INPUT);
-    // A button still held at boot (the MX press that woke the remote from sleep) must not count as a press: it only
-    // counts after it has been released and pressed again. Otherwise the wake press would be read as START.
-    for (Button *b : {&btn_mx, &btn_p1, &btn_p4}) {
-        b->state = digitalRead(b->pin) == HIGH;
-        b->changed = millis();
-    }
+    lgfx::LovyanGFX &disp = board_display();
+    disp.fillScreen(TFT_BLACK);
+    brand(disp, 38, 100, 3);
+    disp.setFont(&fonts::Font2);
+    disp.setTextColor(0x8410, TFT_BLACK);
+    disp.drawCentreString("remote - starting", 160, 150);
+    board_serial_begin(4096);                 // the loader sends 1 KB chunks; the default 256 B would overflow
+    board_inputs_begin();
     canvas.setColorDepth(8);
     canvas.createSprite(320, 240);
-    LittleFS.begin(true);
+    if (!LittleFS.begin(false)) {
+        // nothing readable there (a new remote, or the first start over another firmware's flash layout): LittleFS
+        // is formatted, empty. The PC app loads the patterns and settings again
+        disp.drawCentreString("preparing the flash (first start: up to a minute)", 160, 172);
+        LittleFS.begin(true);
+    }
     mtx = xSemaphoreCreateMutex();
     load_config();
     load_pack();
     boxlink_io_t io = {nullptr, tcp_write};
     boxlink_init(&blink, &io, cfg.cap);
-    loader_io_t lio = {nullptr, l_send, l_busy, l_free, l_open, l_write, l_commit, l_abort, l_remove, l_list, l_reload};
+    link_ids();
+    loader_io_t lio = {nullptr, l_send, l_busy, l_free, l_open, l_write, l_commit, l_abort, l_remove, l_list, l_reload,
+                       l_ident};
     loader_init(&ldr, &lio);
     start_controller();                       // levels 0, stopped
-    wifi_start();
+    wifi_start();                             // (not before the board may drive a box: the RADR's check)
     // control above the loop (priority 1) on the same core, so drawing never delays it; network low, on core 0
     xTaskCreatePinnedToCore(control_task, "control", 8192, nullptr, 5, nullptr, 1);
     xTaskCreatePinnedToCore(network_task, "network", 6144, nullptr, 1, nullptr, 0);
 }
 
-// The power button: a short press switches the remote off, tidily. Output first: STOP (if running), both channels to
-// zero and the box's signal stopped, the settings saved. Then DEEP SLEEP, not the power chip's off: on the OSSM
-// carrier (battery on the M-bus BAT pin) a CoreS3 SE whose AXP2101 is off cannot be switched on again by its power
-// button, only by USB power (tested 2026-09-29, also after the chip's own 6 s hold). In deep sleep the screen, Wi-Fi
-// and the audio/camera/SD rails are off (the 5 V boost stays on, see below) and the MX button or a knob press (RTC GPIOs, high = pressed)
-// wakes it; waking is a normal boot (levels 0, stopped). The chip's 6 s hold remains the full off for storage.
-static void power_off() {
+// Switching off (the M5's power button), the app's part: output first: STOP (if running), both channels to zero and
+// the box's signal stopped, the settings saved. The board then says so on the screen and sleeps.
+void app_shutdown() {
     ctrl_settings_t s;
     {
         Lock lock;
@@ -913,35 +929,22 @@ static void power_off() {
         s = ctl.set;
     }
     save_settings(s);
-    M5.Display.fillScreen(TFT_BLACK);
-    brand(M5.Display, 38, 100, 3);
-    M5.Display.setFont(&fonts::Font2);
-    M5.Display.setTextColor(0x8410, TFT_BLACK);
-    M5.Display.drawCentreString("remote - switching off", 160, 150);
-    M5.Display.drawCentreString("press the big button to switch on", 160, 172);
-    delay(1500);                                                   // let the stop reach the box; time to read
-    // a button still held would wake it at once: wait for all three to be released
-    while (digitalRead(PIN_MX) == HIGH || digitalRead(PIN_PUSH1) == HIGH || digitalRead(PIN_PUSH4) == HIGH) delay(10);
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    M5.Display.setBrightness(0);
-    M5.Display.sleep();
-    // NOT M5.Power.setExtOutput(false): on the carrier the battery (M-bus BAT) seems to reach the AXP2101 through the
-    // SY7088 5 V boost, whose enable comes from the AW9523 on the 3.3 V rail. Switching the boost off (or the AXP off)
-    // cuts the power chip's own supply, and only USB brings it back (2026-09-29: dark, no button woke it).
-    M5.Power.Axp2101.writeRegister8(0x90, 0xB0);                  // ALDO1..4 off (audio, mic, camera, SD); boot restores
-    const uint64_t wake = (1ULL << PIN_MX) | (1ULL << PIN_PUSH1) | (1ULL << PIN_PUSH4);
-    for (gpio_num_t p : {(gpio_num_t)PIN_MX, (gpio_num_t)PIN_PUSH1, (gpio_num_t)PIN_PUSH4}) {
-        rtc_gpio_pullup_dis(p);
-        rtc_gpio_pulldown_en(p);                                   // released = low, whatever the carrier's resistors
-    }
-    esp_sleep_enable_ext1_wakeup(wake, ESP_EXT1_WAKEUP_ANY_HIGH);
-    esp_deep_sleep_start();
 }
 
-void loop() {
-    M5.update();
-    if (M5.BtnPWR.wasClicked()) power_off();
+AppCanvas &app_canvas() { return canvas; }
+
+void app_loop() {
+    board_poll();                              // the board's own (the M5: power button; the RADR: its check)
+    {   // the board may drive a box again (the RADR: its check passed): Wi-Fi up, connect at once
+        static bool drive = board_may_drive();   // (as setup found it: Wi-Fi started there if it could)
+        bool may = board_may_drive();
+        if (may && !drive) {
+            Lock lock;
+            wifi_start();
+            reconnect_now = true;
+        }
+        drive = may;
+    }
     uint8_t ub[512];
     for (int avail; (avail = Serial.available()) > 0;) {       // drain everything waiting
         int n = Serial.readBytes(ub, avail < (int)sizeof ub ? avail : (int)sizeof ub);
@@ -986,6 +989,7 @@ void loop() {
             srtt_max = rtt_max_shown;
         }
         shown_box_vol = sb.tele.device_volume;
+        board_show(sc, sb);                     // the board's lights and sounds (the RADR's LEDs: ARMED)
         draw();
         // a new trip report: out on the USB serial ("[" lines: the PC loader skips them) and into /last_trip.txt,
         // so it can be read later even after the remote restarts
