@@ -1,0 +1,12 @@
+# The remote's flash on the RADR hardware (16 MB, ESP32-S3-WROOM-1-N16R8), its own table (2026-10-06): one 3 MB app
+# slot, no OTA (the PC app flashes it over the CP2102), and LittleFS for the rest (patterns.bin, config.json, the
+# settings; ~12.9 MB). The first flash over the RADR's own firmware (two 6.25 MB OTA slots, a 3.4 MB LittleFS) leaves
+# LittleFS unreadable: the app formats it on its first start and the hub loads the patterns and settings again.
+# The release image ends with the app, so LittleFS is never written by a flash. NVS (0x9000) holds the remote check's
+# result: the first flash writes the whole image (bootloader, this table, the app) and starts it over; every later
+# update writes the app partition only (0x10000, the hub's "app only"), so the check and the settings stay.
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x5000
+factory,  app,  factory,  0x10000,  0x300000
+spiffs,   data, spiffs,   0x310000, 0xCE0000
+coredump, data, coredump, 0xFF0000, 0x10000
