@@ -31,13 +31,24 @@ void boxlink_init(boxlink_t *l, const boxlink_io_t *io, float amps_cap) {
     memset(l, 0, sizeof *l);
     l->io = *io;
     l->amps_cap = amps_cap;
-    l->next_id = 1;
+    l->id_first = BOXLINK_ID_FIRST;
+    l->id_last = BOXLINK_ID_LAST;
+    l->next_id = BOXLINK_ID_FIRST;
     hdlc_decoder_init(&l->dec);
+}
+
+void boxlink_set_ids(boxlink_t *l, uint32_t first, uint32_t last) {
+    if (first < 1 || last < first || last > BOXLINK_IDS_REMOTE_LAST) return;     /* (two-byte varints at most) */
+    l->id_first = first;
+    l->id_last = last;
+    l->next_id = first;
 }
 
 static bool send_request(boxlink_t *l, focstim_rpc_Request *req, uint8_t kind, uint32_t timeout_ms, uint32_t now) {
     focstim_rpc_RpcMessage msg = focstim_rpc_RpcMessage_init_zero;
-    req->id = l->next_id++;
+    uint32_t id = l->next_id < l->id_first || l->next_id > l->id_last ? l->id_first : l->next_id;
+    l->next_id = id >= l->id_last ? l->id_first : id + 1;
+    req->id = id;
     msg.which_message = focstim_rpc_RpcMessage_request_tag;
     msg.message.request = *req;
     uint8_t buf[160], frame[2 * 160 + 8];
@@ -111,11 +122,15 @@ void boxlink_connected(boxlink_t *l, uint32_t now_ms) {
     char trip[BOXLINK_TRIP_LINES][200];         /* the last trip report outlives the connection */
     int ntrip = l->ntrip;
     uint32_t trip_seq = l->trip_seq;
+    uint32_t id_first = l->id_first, id_last = l->id_last, next_id = l->next_id;   /* the range outlives it too */
     memcpy(trip, l->trip, sizeof trip);
     boxlink_init(l, &io, cap);
     memcpy(l->trip, trip, sizeof trip);
     l->ntrip = ntrip;
     l->trip_seq = trip_seq;
+    l->id_first = id_first;
+    l->id_last = id_last;
+    l->next_id = next_id;
     l->state = BOXLINK_HANDSHAKE_FW;
     focstim_rpc_Request req = focstim_rpc_Request_init_zero;
     req.which_params = focstim_rpc_Request_request_firmware_version_tag;

@@ -24,6 +24,9 @@ EXPORT void bl_init(write_cb_t cb, float cap) {
     boxlink_io_t io = {NULL, wr};
     boxlink_init(&L, &io, cap);
 }
+EXPORT void bl_set_ids(uint32_t first, uint32_t last) { boxlink_set_ids(&L, first, last); }
+EXPORT uint32_t bl_next_id(void) { return L.next_id; }
+EXPORT void bl_set_next_id(uint32_t id) { L.next_id = id; }
 EXPORT void bl_connected(uint32_t now) { boxlink_connected(&L, now); }
 EXPORT void bl_disconnected(const char *why) { boxlink_disconnected(&L, why); }
 EXPORT void bl_feed(const uint8_t *d, int n, uint32_t now) { boxlink_feed(&L, d, (size_t)n, now); }

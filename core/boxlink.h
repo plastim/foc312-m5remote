@@ -8,7 +8,14 @@
  *   at most BOXLINK_MAX_PENDING unacknowledged requests.
  * Any request unanswered within its timeout, an error response, a boot notification (the box rebooted: a trip and
  * a power cycle) or a lost connection -> FAULT, with the reason; the app stops, and reconnects only when told to.
- * The box's trip report ("biphasic trip:" debug lines) is kept for the screen. No allocation. */
+ * The box's trip report ("biphasic trip:" debug lines) is kept for the screen. No allocation.
+ *
+ * Request ids: the box answers every request with its id, and its ESP32 passes USB and Wi-Fi to the one STM32 UART, so
+ * every reply goes to every client on the box. Each client counts in its own range, so a reply to another one is never
+ * taken for ours: the PC app 1..8191 (foc312-engine device/client.py counts 1..4095), the remotes BOXLINK_IDS_REMOTE_*,
+ * split per kind of remote so two remotes on one box tell each other apart too: the M5 BOXLINK_IDS_M5_* (boxlink_init's
+ * range), the RADR-hardware build BOXLINK_IDS_RADR_* (boxlink_set_ids). All are two-byte varints at most. A reply whose
+ * id is not one of ours still waiting is ignored, as before. */
 #ifndef BOXLINK_H
 #define BOXLINK_H
 
@@ -30,6 +37,15 @@
 #define BOXLINK_PENDING_SLOTS 64
 #define BOXLINK_TRIP_LINES 4
 #define BOXLINK_N_AXES 15          /* the fork's axes 60..74 */
+/* request ids (see above): the PC app's are 1..8191, every remote's BOXLINK_IDS_REMOTE_*, split per kind */
+#define BOXLINK_IDS_REMOTE_FIRST 8192
+#define BOXLINK_IDS_REMOTE_LAST 16383
+#define BOXLINK_IDS_M5_FIRST 8192
+#define BOXLINK_IDS_M5_LAST 12287
+#define BOXLINK_IDS_RADR_FIRST 12288
+#define BOXLINK_IDS_RADR_LAST 16383
+#define BOXLINK_ID_FIRST BOXLINK_IDS_M5_FIRST     /* boxlink_init's range (the M5's); boxlink_set_ids for another */
+#define BOXLINK_ID_LAST BOXLINK_IDS_M5_LAST
 
 typedef enum { BOXLINK_IDLE = 0, BOXLINK_HANDSHAKE_FW, BOXLINK_HANDSHAKE_CAPS, BOXLINK_STARTING, BOXLINK_RUNNING,
                BOXLINK_FAULT } boxlink_state_t;
@@ -62,7 +78,8 @@ typedef struct {
     int fork_version;
     bool want_play, playing;          /* the signal: asked for / confirmed by the box (RUNNING = ready, not playing) */
     float max_amps, amps_cap;
-    uint32_t next_id;
+    uint32_t id_first, id_last;       /* this remote's request ids (boxlink_set_ids; kept across reconnects) */
+    uint32_t next_id;                 /* id_first..id_last, wrapping; kept across reconnects */
     struct { uint32_t id, deadline_ms, sent_ms; uint8_t kind; bool used; } pending[BOXLINK_PENDING_SLOTS];
     int npending;
     hdlc_decoder_t dec;
@@ -80,6 +97,8 @@ typedef struct {
 } boxlink_t;
 
 void boxlink_init(boxlink_t *l, const boxlink_io_t *io, float amps_cap);
+/* this remote's request-id range (BOXLINK_IDS_*; boxlink_init: the M5's). Replies with other ids are not ours */
+void boxlink_set_ids(boxlink_t *l, uint32_t first, uint32_t last);
 /* the transport just connected: start the handshake */
 void boxlink_connected(boxlink_t *l, uint32_t now_ms);
 /* the transport closed or failed */
