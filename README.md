@@ -7,6 +7,7 @@ with no computer needed, straight to the box over Wi-Fi.
 It runs on the **OSSM M5 Remote** hardware by ortlof: an M5Stack CoreS3 SE on a carrier with four encoders and a
 button. Build or buy one from **[ortlof/OSSM-M5-Remote](https://github.com/ortlof/OSSM-M5-Remote)**; this repository
 is its firmware for e-stim (written from scratch; the hardware design is ortlof's).
+It also runs on the **RADR**, R+D's wireless remote, for patterns ([The RADR hardware](#the-radr-hardware)).
 
 > **Start here:** install the PC app with its
 > **[installation guide](https://github.com/plastim/foc312-engine/blob/main/INSTALL.md)**. It flashes this firmware
@@ -53,6 +54,76 @@ without moving anything:
 The effect is strongest with the lopsided ET-312-style pulses (a short strong half and a long weak one) and smaller
 with the even shapes. Either direction is equally safe: every pulse is balanced (the same charge each way), so
 nothing builds up under either pad.
+
+## The RADR hardware
+
+The firmware also runs on the **RADR**, R+D's wireless remote (v0.4: two knobs, two shoulder buttons, three buttons
+under a 2" screen, an ESP32-S3 behind a CP2102 USB port). The hardware design is R+D's
+([researchanddesire](https://github.com/researchanddesire), CERN-OHL-S-2.0); this firmware is ours, written from
+scratch: only facts about the hardware (pins, parts) are used, none of their code or files. It is not R+D's firmware
+and not made or supported by R+D. It plays the **patterns**, with the same safety stack, box link, Wi-Fi and settings
+as the M5 remote. (Why the hardware's licence does not cover this firmware: [SPEC.md](SPEC.md#the-radr-hardware-second-board).)
+
+| Control | Main screen | Pattern list | Options (wiring picture) |
+|---|---|---|---|
+| Left knob | master volume, always | scroll | move the highlight |
+| Right knob | the focused one of **A / B / MA** | jump 10 | the focused one's: A's wires / B's wires / pulse shape |
+| Left / right shoulder | move the focus (wraps round; tabs on the screen, a short buzz) | top-left: pick, top-right: back | top-left: select, top-right: the focused wires to their next pair |
+| Centre button | start / **STOP** | start / STOP | start / STOP |
+| Under-left button | options | back | back |
+| Under-right button | pattern list | pick | select (toggle / next) |
+
+STOP acts on the press, on every screen, and always wins. In the menus no knob touches the output. The LEDs are
+**red while output may flow**, dim green when connected and stopped, amber on a fault; a beep when output starts, a
+lower one when it stops. The battery level on the screen is the remote's own fuel gauge.
+
+**The remote check.** On its first start, before it starts its Wi-Fi or drives a box, the remote asks you to turn
+each knob (clockwise first, then back), press each button once, and confirm the screen's colours and orientation
+(under-left turns it 180 degrees, under-right inverts the colours, centre confirms). This also learns which way each
+knob turns on your unit. It remembers the result; **Options > Remote check** runs it again (stop the output first).
+
+### First flash: back up the RADR's own firmware first
+
+Flashing this firmware replaces the RADR's own firmware and its files. Keep a full copy so you can go back:
+
+1. Install esptool (`python -m pip install esptool`) and plug the RADR in by USB. Find its port (Device Manager:
+   *Silicon Labs CP210x USB to UART Bridge (COMx)*). The CP2102's auto-reset puts it in its bootloader: no button.
+2. Read the whole 16 MB flash, twice, and compare the two (about three minutes each):
+
+   ```powershell
+   python -m esptool --chip esp32s3 --port COMx --baud 921600 read-flash 0x0 0x1000000 radr-backup-1.bin
+   python -m esptool --chip esp32s3 --port COMx --baud 921600 read-flash 0x0 0x1000000 radr-backup-2.bin
+   certutil -hashfile radr-backup-1.bin SHA256
+   certutil -hashfile radr-backup-2.bin SHA256
+   ```
+
+   Both files must be 16,777,216 bytes with the same SHA-256. Keep one somewhere safe: it holds the RADR's own
+   firmware and anything it stored.
+3. Flash this firmware. In the hub (**M5 remote** tab): **Detect** shows the RADR as *CP2102, not a remote yet*.
+   **Check for updates**, **Download** the newest `radr-v…` release (it shows as **[RADR]** in **Image**), choose it,
+   then **Flash…**: the hub asks you to confirm a **first flash**, which it does only for a CP2102 that does not
+   answer as a remote, and only with an image for the RADR. By hand:
+   `python -m esptool --chip esp32s3 --port COMx --baud 921600 write-flash 0x0 stim-remote-radr-XXXXXXX.bin`.
+4. The RADR restarts into the remote check (above). Then press **Detect** again (the hub now knows it as the
+   **RADR remote**, by its ESP32's MAC: every CP2102 has the same serial number), and carry on as for the M5 remote
+   from [Setting it up](#setting-it-up), step 3: settings, **Load patterns & settings**, the box's Wi-Fi.
+
+**Updates** go the same way (**Flash…** with a newer `radr-v…` image). The hub then writes **only the app**: the
+remote check's result, the patterns and the settings stay. (It reads the remote's partition table first; should a
+later image change the flash layout, it writes the whole image and the remote asks for its check again.) By hand,
+from the PC app's folder: `.\venv\Scripts\python.exe -m stimengine.remote.flash --port COMx --mode app <image>`.
+Writing the whole image at `0x0` works too; the remote then asks for its check again.
+
+**Going back to the RADR's own firmware:** write your backup over everything:
+
+```powershell
+python -m esptool --chip esp32s3 --port COMx --baud 921600 write-flash 0x0 radr-backup-1.bin
+```
+
+The hub never flashes an M5 image onto a RADR or a RADR image onto an M5, and a release for the RADR is signed as
+the RADR's (apps from before RADR support refuse it). Use **one controller per box at a time**: the M5 remote, the
+RADR and the PC app each drive a box on their own and do not hand it over to each other, so with two of them on the
+same box (both in house Wi-Fi mode, or one on USB) stop one before you start the other.
 
 ## How the remote reaches the box: the Wi-Fi
 
@@ -134,8 +205,9 @@ Wi-Fi** undoes it. The box's output never starts during this.
 
 Everything the hub does can be done by hand.
 
-**Flash the remote with esptool.** Download the `.bin` from the newest
-[release](https://github.com/plastim/foc312-m5remote/releases), then run:
+**Flash the remote with esptool.** Download the `.bin` from the newest M5
+[release](https://github.com/plastim/foc312-m5remote/releases) (tags `v…`; the `radr-v…` releases are for the
+[RADR hardware](#the-radr-hardware)), then run:
 
 ```powershell
 python -m pip install esptool
@@ -189,15 +261,21 @@ report; power-cycle the box and start from zero. Read the safety notes in the
 
 ```
 cd m5
-pio run -e app -t upload --upload-port COMx
+pio run -e app -t upload --upload-port COMx          the M5 remote
+cd radr
+pio run -e radr -t upload --upload-port COMx         the RADR hardware (back up its own firmware first)
 ```
 
-`core/` is portable C99 with no allocation (the ET-312 emulator, the safety stack, the box link); it is tested on
-the PC against the Python engine by the engine's test suite. `tools/package_m5.py` makes the release image.
+`core/` is portable C99 with no allocation (the ET-312 emulator, the safety stack, the box link, the controls); it is
+tested on the PC against the Python engine by the engine's test suite. `app/` is the app both boards run (the
+screens, the box link, the loader); `m5/` and `radr/` are the boards (knobs, buttons, display, their own extras).
+`tools/package_m5.py` makes the release image (`--board radr` for the RADR's).
 
 ## License and credits
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md); third-party parts in `NOTICE`. Hardware:
-[ortlof/OSSM-M5-Remote](https://github.com/ortlof/OSSM-M5-Remote) (CC BY-SA 4.0).
+[ortlof/OSSM-M5-Remote](https://github.com/ortlof/OSSM-M5-Remote) (CC BY-SA 4.0); it also runs on the RADR, R+D's
+wireless remote ([researchanddesire](https://github.com/researchanddesire), CERN-OHL-S-2.0). Both firmwares here are
+written from scratch from facts about the hardware; neither carries the hardware's licence (SPEC.md).
 
 Support the project: [Patreon](https://www.patreon.com/plastim) · [PlaStim store](https://plastim.net/)
