@@ -77,6 +77,16 @@ static void play_pattern(ctrl_t *c, int index) {
     snprintf(c->status, sizeof c->status, "%s", e.name);
 }
 
+/* the controls' names in the messages (ctrl_set_control_names): the M5's unless the app says otherwise */
+static const char *name_list = "knob 1", *name_master = "knob 1", *name_levels = "knobs 2, 3", *name_start = "MX";
+
+void ctrl_set_control_names(const char *list, const char *master, const char *levels, const char *start) {
+    if (list) name_list = list;
+    if (master) name_master = master;
+    if (levels) name_levels = levels;
+    if (start) name_start = start;
+}
+
 static void zero_levels(ctrl_t *c) {
     c->level_target[0] = c->level_target[1] = 0;
     c->level_applied[0] = c->level_applied[1] = 0.0;
@@ -112,15 +122,44 @@ void ctrl_init(ctrl_t *c, const pack_t *pack, const ctrl_settings_t *saved, int 
     c->last_t = NAN;
     c->stop_t = -1e9;
     c->screen = SCREEN_RUN;
+    c->opt_hidden = CTRL_HIDE_DEFAULT;
     int want = c->set.pattern;
     c->set.pattern = -1;
-    if (want >= 0) play_pattern(c, want);
-    else status(c, pack && pack->count ? "press knob 1 to pick a pattern" : "no patterns loaded");
+    if (want >= 0) {
+        play_pattern(c, want);
+    } else if (pack && pack->count) {
+        char t[64];
+        snprintf(t, sizeof t, "press %s to pick a pattern", name_list);
+        status(c, t);
+    } else {
+        status(c, "no patterns loaded");
+    }
 }
 
 static void switch_box(ctrl_t *c, int box, double now);
 
+bool ctrl_option_shown(const ctrl_t *c, int option) {
+    return option >= 0 && option < OPT_COUNT && !(c->opt_hidden & CTRL_OPT_BIT(option));
+}
+
+void ctrl_hide_options(ctrl_t *c, uint32_t mask) {
+    c->opt_hidden = mask & ~CTRL_OPT_BIT(OPT_BACK);              /* (Back is always there) */
+    if (c->screen == SCREEN_OPTIONS && !ctrl_option_shown(c, c->cursor)) c->cursor = OPT_BACK;
+}
+
 static void move_cursor(ctrl_t *c, int by, double now) {
+    if (c->screen == SCREEN_OPTIONS && c->opt_hidden) {          /* one shown option a step, hidden ones skipped */
+        int k = c->cursor;
+        for (int n = by < 0 ? -by : by; n > 0; n--) {
+            int j = k + (by > 0 ? 1 : -1);
+            while (j >= 0 && j < OPT_COUNT && !ctrl_option_shown(c, j)) j += by > 0 ? 1 : -1;
+            if (j < 0 || j >= OPT_COUNT) break;
+            k = j;
+        }
+        c->cursor = k;
+        c->nav_t = now;
+        return;
+    }
     int n = c->screen == SCREEN_PATTERNS ? (c->pack ? c->pack->count : 0) : OPT_COUNT;
     c->cursor = n ? clampi(c->cursor + by, 0, n - 1) : 0;
     c->nav_t = now;
@@ -185,6 +224,7 @@ void ctrl_knob(ctrl_t *c, ctrl_knob_t knob, int detents, double now) {
 }
 
 static void activate_option(ctrl_t *c, int opt, double now) {
+    if (opt != OPT_BACK && !ctrl_option_shown(c, opt)) return;
     switch (opt) {
     case OPT_POLARITY_1:
     case OPT_POLARITY_2:
@@ -219,11 +259,22 @@ static void activate_option(ctrl_t *c, int opt, double now) {
     case OPT_BOX:
         switch_box(c, (c->set.box + 1) % c->n_boxes, now);
         break;
+    case OPT_DEVICE:                            /* the app's hardware check: never under a running output */
+        if (ctrl_armed(c)) { status(c, "stop the output before the remote check"); break; }
+        c->device_seq++;
+        c->screen = SCREEN_RUN;
+        break;
     case OPT_BACK:
     default:
         c->screen = SCREEN_RUN;
         break;
     }
+}
+
+void ctrl_option_activate(ctrl_t *c, int opt, double now) {   /* a board's shortcut: an option, as if picked */
+    if (c->screen != SCREEN_OPTIONS) return;
+    c->nav_t = now;
+    activate_option(c, opt, now);
 }
 
 static void switch_box(ctrl_t *c, int box, double now) {
@@ -273,7 +324,12 @@ void ctrl_button(ctrl_t *c, double now) {
     }
     if (now - c->stop_t < CTRL_RESTART_BLOCK_S) return;   /* a quick double press never turns it back on */
     if (!c->link_running) { status(c, "no box connected"); return; }
-    if (c->set.pattern < 0) { status(c, "pick a pattern first (knob 1)"); return; }
+    if (c->set.pattern < 0) {
+        char t[64];
+        snprintf(t, sizeof t, "pick a pattern first (%s)", name_list);
+        status(c, t);
+        return;
+    }
     safety_arm(&c->saf);                        /* master slow-starts from 0 */
     status(c, "running");
 }
@@ -355,6 +411,7 @@ const char *ctrl_option_text(const ctrl_t *c, int option, char *buf, int cap) {
         break;
     case OPT_SKIP_RAMP: snprintf(buf, (size_t)cap, "Skip mode ramp: %s", s->skip_mode_ramp ? "on" : "off"); break;
     case OPT_BOX: snprintf(buf, (size_t)cap, "Box: %d of %d", s->box + 1, c->n_boxes); break;
+    case OPT_DEVICE: snprintf(buf, (size_t)cap, "Remote check: knobs, buttons, screen"); break;
     default: snprintf(buf, (size_t)cap, "Back"); break;
     }
     return buf;

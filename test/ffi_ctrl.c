@@ -64,3 +64,13 @@ EXPORT const char *rc_option(int opt) {
     static char buf[64];
     return ctrl_option_text(&C, opt, buf, sizeof buf);
 }
+/* the RADR build's: hidden options, the hardware check asked for, the controls' names; the controller itself for
+ * ffi_radr.c */
+EXPORT void rc_hide_options(unsigned mask) { ctrl_hide_options(&C, mask); }
+EXPORT unsigned rc_hide_default_mask(void) { return CTRL_HIDE_DEFAULT; }
+EXPORT unsigned rc_device_seq(void) { return C.device_seq; }
+EXPORT int rc_option_shown(int opt) { return ctrl_option_shown(&C, opt); }
+EXPORT void rc_control_names(const char *list, const char *master, const char *levels, const char *start) {
+    ctrl_set_control_names(list, master, levels, start);
+}
+EXPORT ctrl_t *rc_ctrl(void) { return &C; }
