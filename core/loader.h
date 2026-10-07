@@ -3,7 +3,10 @@
  * callbacks and stores files through callbacks.
  *
  * Protocol (text lines end in '\n'; names are [a-z0-9._-], 1-31 chars):
- *   HELLO                  -> OK stim-remote 1 <free bytes>           | ERR busy
+ *   HELLO                  -> OK stim-remote 1 <free bytes> [board=<m5|radr> mac=<the ESP32's MAC>]   | ERR busy
+ *                             (firmware since the RADR build ends it with what the remote runs on, io.ident; a
+ *                             USB-UART bridge's serial number is the bridge's, the same on every unit, so the PC knows
+ *                             a remote by its MAC and flashes only images made for its board)
  *   PUT <name> <size> <crc32 hex>
  *                          -> READY <chunk>  then <size> raw bytes follow; after every <chunk> bytes and at the
  *                             end the device answers ACK <bytes so far>; at the end it checks the CRC and
@@ -37,6 +40,8 @@ typedef struct {
     bool (*remove)(void *ctx, const char *name);
     bool (*list)(void *ctx, int index, char *name, size_t cap, uint32_t *size);   /* false after the last */
     bool (*reload)(void *ctx, char *reason, size_t cap);
+    /* what the remote is, as "key=value" words for HELLO ("board=radr mac=02:00:00:00:00:0a"); NULL: none */
+    void (*ident)(void *ctx, char *buf, size_t cap);
 } loader_io_t;
 
 typedef struct {

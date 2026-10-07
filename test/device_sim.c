@@ -1,7 +1,9 @@
 /* A simulated M5 remote for the USB loader tests: the real loader state machine (loader.c) on stdin/stdout,
  * files kept in the directory given as argv[1] (a temporary file per transfer, committed by rename). The app is
  * "busy" (armed) while a file named BUSY exists there. RELOAD validates patterns.bin with the real pack reader and
- * requires config.json. Used by tests/test_remote_loader.py through pipes. */
+ * requires config.json. Used by tests/test_remote_loader.py through pipes. HELLO ends with "board=m5
+ * mac=02:00:00:00:00:05"; argv[2] "radr" = the build for the RADR hardware ("board=radr mac=02:00:00:00:00:0a"),
+ * "noident" = firmware from before the board words. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,6 +128,12 @@ static bool reload(void *ctx, char *reason, size_t cap) {
     return true;
 }
 
+static bool sim_radr = false;
+static void sim_ident(void *ctx, char *buf, size_t cap) {
+    (void)ctx;
+    snprintf(buf, cap, "board=%s mac=02:00:00:00:00:%s", sim_radr ? "radr" : "m5", sim_radr ? "0a" : "05");
+}
+
 static uint32_t now_ms(void) {
     return (uint32_t)((unsigned long long)clock() * 1000ULL / CLOCKS_PER_SEC);
 }
@@ -138,7 +146,9 @@ int main(int argc, char **argv) {
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
     loader_io_t io = {NULL, send_line, busy, free_bytes, open_tmp, write_tmp, commit, abort_tmp, remove_file, list,
-                      reload};
+                      reload, sim_ident};
+    if (argc >= 3 && !strcmp(argv[2], "noident")) io.ident = NULL;       /* firmware before the board words */
+    if (argc >= 3 && !strcmp(argv[2], "radr")) sim_radr = true;           /* the RADR hardware's build */
     loader_t l;
     loader_init(&l, &io);
     uint8_t buf[4096];

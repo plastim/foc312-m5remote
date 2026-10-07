@@ -48,7 +48,15 @@ static void command(loader_t *l, char *line, uint32_t now_ms) {
         return;
     }
     if (!strcmp(cmd, "HELLO")) {
-        send_num(l, "OK stim-remote 1", (unsigned long)l->io.free_bytes(l->io.ctx));
+        char buf[160];
+        int k = snprintf(buf, sizeof buf, "OK stim-remote 1 %lu", (unsigned long)l->io.free_bytes(l->io.ctx));
+        if (l->io.ident && k > 0 && k < (int)sizeof buf - 2) {     /* what it runs on: "board=radr mac=..." */
+            buf[k++] = ' ';
+            l->io.ident(l->io.ctx, buf + k, sizeof buf - (size_t)k - 1);
+            k += (int)strlen(buf + k);
+        }
+        snprintf(buf + k, sizeof buf - (size_t)k, "\n");
+        l->io.send(l->io.ctx, buf);
     } else if (!strcmp(cmd, "PUT")) {
         if (n < 4 || !loader_valid_name(a1)) { l->io.send(l->io.ctx, "ERR name\n"); return; }
         char *e1, *e2;
