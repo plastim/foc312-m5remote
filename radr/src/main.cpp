@@ -144,9 +144,18 @@ void board_begin() {
 
 lgfx::LovyanGFX &board_display() { return lcd(); }
 
+// UART0 through the CP2102, no flow control. The driver empties the 128-byte FIFO into its ring buffer when it holds
+// RX_FIFO_FULL bytes (the IDF default, 120, left 8 bytes of slack: under 0.2 ms at this baud), so an interrupt delayed
+// by Wi-Fi or a flash write lost bytes. 460800 and a 32-byte threshold leave ~2 ms; the app writes the flash only
+// between chunks (app.cpp, the loader's stage). The ring buffer holds several chunks.
+static const uint32_t LOADER_BAUD = 460800;        // stimengine.remote.loader SERIAL_BAUD
+static const uint8_t RX_FIFO_FULL = 32;
+static const size_t RX_QUEUE_MIN = 8192;
+
 void board_serial_begin(size_t rx_queue) {
-    Serial.setRxBufferSize(rx_queue);              // UART0 through the CP2102: the windowed loader keeps it drained
-    Serial.begin(921600);                          // (stimengine.remote.loader SERIAL_BAUD)
+    Serial.setRxBufferSize(rx_queue > RX_QUEUE_MIN ? rx_queue : RX_QUEUE_MIN);
+    Serial.begin(LOADER_BAUD);
+    Serial.setRxFIFOFull(RX_FIFO_FULL);
 }
 
 // ---- the LEDs (3 x WS2812B: GRB, 800 kHz, through the RMT at 100 ns a tick) ---------------------------------------

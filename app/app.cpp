@@ -246,21 +246,64 @@ static char part_path[48];
 static void l_send(void *, const char *line) { Serial.print(line); }
 static bool l_busy(void *) { return ctrl_armed(&ctl); }
 static uint32_t l_free(void *) { return (uint32_t)(LittleFS.totalBytes() - LittleFS.usedBytes()); }
+#if defined(BOARD_RADR) && BOARD_RADR
+// A serial port behind a USB-UART bridge (the RADR's CP2102) has no flow control, and a flash write stops the cache,
+// and with it the UART's interrupt, for milliseconds: bytes arriving meanwhile overrun the UART's 128-byte FIFO and
+// are lost. So a chunk is staged in RAM and written to the flash only once all of it is in. The loader answers
+// "ACK" after that write, and the PC sends the next chunk only after the ACK: nothing is on the wire while the flash
+// is written. (The M5's USB serial has flow control: it writes as the bytes come, as it always has.)
+static uint8_t stage[LOADER_CHUNK];
+static size_t staged = 0;
+
+static bool stage_flush() {
+    bool ok = !staged || (part && part.write(stage, staged) == staged);
+    staged = 0;
+    return ok;
+}
+#endif
+
 static bool l_open(void *, const char *name, uint32_t) {
     snprintf(part_path, sizeof part_path, "/.%s.part", name);
     part = LittleFS.open(part_path, "w");
+#if defined(BOARD_RADR) && BOARD_RADR
+    staged = 0;
+#endif
     return (bool)part;
 }
+#if defined(BOARD_RADR) && BOARD_RADR
+static bool l_write(void *, const uint8_t *d, size_t n) {
+    if (!part) return false;
+    while (n) {                                // (the loader never passes a chunk's end: a full stage is one chunk)
+        size_t k = n < sizeof stage - staged ? n : sizeof stage - staged;
+        memcpy(stage + staged, d, k);
+        staged += k;
+        d += k;
+        n -= k;
+        if (staged == sizeof stage && !stage_flush()) return false;
+    }
+    return true;
+}
+#else
 static bool l_write(void *, const uint8_t *d, size_t n) { return part && part.write(d, n) == n; }
+#endif
 static bool l_commit(void *, const char *name) {
     if (!part) return false;
+#if defined(BOARD_RADR) && BOARD_RADR
+    if (!stage_flush()) { part.close(); return false; }   // the last, partial chunk (the loader aborts on false)
+#endif
     part.close();
     char path[48];
     snprintf(path, sizeof path, "/%s", name);
     if (LittleFS.exists(path)) LittleFS.remove(path);
     return LittleFS.rename(part_path, path);
 }
-static void l_abort(void *) { if (part) part.close(); if (LittleFS.exists(part_path)) LittleFS.remove(part_path); }
+static void l_abort(void *) {
+#if defined(BOARD_RADR) && BOARD_RADR
+    staged = 0;
+#endif
+    if (part) part.close();
+    if (LittleFS.exists(part_path)) LittleFS.remove(part_path);
+}
 static bool l_remove(void *, const char *name) {
     char path[48];
     snprintf(path, sizeof path, "/%s", name);

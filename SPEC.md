@@ -68,8 +68,12 @@ app, two boards, so a safety fix lands once:
   the first start, then the check. **Later updates write the app partition only** (foc312-engine
   `stimengine/remote/flash.py`, after reading the remote's table and finding it is the image's), so NVS (the check)
   and LittleFS (patterns, settings) stay. The owner backs up the RADR's own firmware first (README).
-- **Loader over UART0:** 921600 baud (`stimengine.remote.loader.SERIAL_BAUD`; the M5's USB serial ignores the baud).
-  The PC opens the port with DTR / RTS low (deasserted), so neither EN nor IO0 moves. HELLO ends with
+- **Loader over UART0:** 460800 baud (`stimengine.remote.loader.SERIAL_BAUD`; the M5's USB serial ignores the baud).
+  The PC opens the port with DTR / RTS low (deasserted), so neither EN nor IO0 moves. A UART has no flow control and
+  its interrupt waits out every flash write, so the RADR build stages each 1 KB chunk in RAM and writes it to the
+  flash before its ACK (no bytes on the wire meanwhile), the driver empties the FIFO at 32 bytes (not 120) and the
+  ring buffer is 8 KB. The PC resends a file whose transfer failed (a lost byte: no ACK; a damaged one: ERR crc) up to
+  twice; a failed transfer never replaces the file on the remote (the old one stays). HELLO ends with
   `board=radr mac=<the ESP32's MAC>` (the M5's with `board=m5`; older PCs read only the number before them): a
   CP2102's serial number is the same on every unit ("0001"), so the hub remembers a RADR by its MAC, and it flashes
   an image only onto its board.
