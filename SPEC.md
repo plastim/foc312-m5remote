@@ -68,7 +68,7 @@ app, two boards, so a safety fix lands once:
   the first start, then the check. **Later updates write the app partition only** (foc312-engine
   `stimengine/remote/flash.py`, after reading the remote's table and finding it is the image's), so NVS (the check)
   and LittleFS (patterns, settings) stay. The owner backs up the RADR's own firmware first (README).
-- **Loader over UART0:** 460800 baud (`stimengine.remote.loader.SERIAL_BAUD`; the M5's USB serial ignores the baud).
+- **Loader over UART0:** 115200 baud (460800 lost bytes on the hardware; `stimengine.remote.loader.SERIAL_BAUD`; the M5's USB serial ignores the baud).
   The PC opens the port with DTR / RTS low (deasserted), so neither EN nor IO0 moves. A UART has no flow control and
   its interrupt waits out every flash write, so the RADR build stages each 1 KB chunk in RAM and writes it to the
   flash before its ACK (no bytes on the wire meanwhile), the driver empties the FIFO at 32 bytes (not 120) and the
