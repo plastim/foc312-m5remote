@@ -52,6 +52,10 @@ typedef struct {
     char name[LOADER_NAME_MAX + 1];
     uint32_t size, received, crc_expect, crc, since_ack;
     uint32_t last_ms;
+    /* a chunk is held here and written to the store only once it is complete, then ACKed: the sender waits for that
+       ACK, so nothing arrives while the store writes (a flash write stalls the chip; on a UART with no flow control,
+       such as the RADR's CP2102, bytes arriving then were lost) */
+    uint8_t chunk[LOADER_CHUNK];
 } loader_t;
 
 void loader_init(loader_t *l, const loader_io_t *io);

@@ -148,7 +148,7 @@ lgfx::LovyanGFX &board_display() { return lcd(); }
 // RX_FIFO_FULL bytes (the IDF default, 120, left 8 bytes of slack: under 0.2 ms at this baud), so an interrupt delayed
 // by Wi-Fi or a flash write lost bytes. 460800 and a 32-byte threshold leave ~2 ms; the app writes the flash only
 // between chunks (app.cpp, the loader's stage). The ring buffer holds several chunks.
-static const uint32_t LOADER_BAUD = 460800;        // stimengine.remote.loader SERIAL_BAUD
+static const uint32_t LOADER_BAUD = 115200;        // stimengine.remote.loader SERIAL_BAUD
 static const uint8_t RX_FIFO_FULL = 32;
 static const size_t RX_QUEUE_MIN = 8192;
 

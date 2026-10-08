@@ -105,17 +105,18 @@ void loader_feed(loader_t *l, const uint8_t *data, size_t n, uint32_t now_ms) {
             size_t take = n - i;
             if (take > want) take = want;
             if (take > room) take = room;
-            if (!l->io.write(l->io.ctx, data + i, take)) {
-                end_transfer(l, false);
-                l->io.send(l->io.ctx, "ERR write\n");
-                return;                           /* the rest of this buffer is file data we can't use */
-            }
+            memcpy(l->chunk + l->since_ack, data + i, take);     /* held until the chunk is complete (loader.h) */
             l->crc = pack_crc32(l->crc, data + i, take);
             l->received += (uint32_t)take;
             l->since_ack += (uint32_t)take;
             l->last_ms = now_ms;
             i += take;
             if (l->since_ack == LOADER_CHUNK || l->received == l->size) {
+                if (!l->io.write(l->io.ctx, l->chunk, l->since_ack)) {
+                    end_transfer(l, false);
+                    l->io.send(l->io.ctx, "ERR write\n");
+                    return;                       /* the rest of this buffer is file data we can't use */
+                }
                 l->since_ack = 0;
                 send_num(l, "ACK", (unsigned long)l->received);
             }
