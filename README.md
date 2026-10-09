@@ -88,6 +88,12 @@ Flashing this firmware replaces the RADR's own firmware and its files. Keep a fu
 
 1. Install esptool (`python -m pip install esptool`) and plug the RADR in by USB. Find its port (Device Manager:
    *Silicon Labs CP210x USB to UART Bridge (COMx)*). The CP2102's auto-reset puts it in its bootloader: no button.
+   **No COM port?** If Device Manager lists *CP2102 USB to UART Bridge Controller* under *Other devices* with a
+   warning (*The drivers for this device are not installed*, Code 28), Windows has no driver for the RADR's USB chip.
+   Install the **CP210x Universal Windows Driver** from Silicon Labs
+   ([USB to UART bridge VCP drivers](https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers)): unzip
+   it, right-click `silabser.inf` and **Install** (or Device Manager > the CP2102 > **Update driver** > **Browse** to
+   the unzipped folder), then unplug and replug the RADR. Windows Update often installs it by itself, not always.
 2. Read the whole 16 MB flash, twice, and compare the two (about three minutes each):
 
    ```powershell
